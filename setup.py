@@ -5,11 +5,13 @@ import setuptools
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from setuptools_us4us.setup_helpers import setup_version  # noqa: E402
+from setuptools_us4us.setup_helpers import read_version_file  # noqa: E402
 
 setuptools.setup(
     name="setuptools_us4us",
-    version=setup_version("setuptools_us4us"),
+    # This package's own version is maintained manually in version.py
+    # (bump it and tag va.b.c on release).
+    version=read_version_file("setuptools_us4us/version.py"),
     author="us4us Ltd.",
     author_email="support@us4us.eu",
     description="Shared build-time (setuptools) helpers for the us4us "

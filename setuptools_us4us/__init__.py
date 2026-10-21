@@ -11,6 +11,7 @@ from setuptools_us4us.version import __version__
 from setuptools_us4us.versioning import (
     VersioningError,
     find_parent_release_branch,
+    get_commit,
     get_version,
     get_version_for_release_branch,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "VersioningError",
     "__version__",
     "find_parent_release_branch",
+    "get_commit",
     "get_version",
     "get_version_for_release_branch",
     "is_dev_version",

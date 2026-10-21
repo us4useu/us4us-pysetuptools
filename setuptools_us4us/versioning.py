@@ -2,8 +2,10 @@
 The rules implemented here are the ones used across the us4us Python
 projects:
 
-- a commit tagged with a release tag (``va.b.c``) marks the stable
-  version ``a.b.c``,
+- a commit tagged with a release tag (``va.b.c``) or a release candidate
+  tag (``va.b.c-rcN``) marks the stable version ``a.b.c``; release
+  candidates of ``a.b.c`` are built with the final version number, so the
+  tested package is the one that gets released,
 - a commit on a **release branch** (``va.b.x`` or the legacy ``va.b.0-dev``)
   produces a development version of the next major.minor, i.e.
   ``a.b.(c+1).devYYYYMMDD``, where ``va.b.c`` is the latest release tag
@@ -28,6 +30,10 @@ RELEASE_BRANCH_PATTERNS = (
 
 #: Tag names denoting a stable release, e.g. v0.7.1
 RELEASE_TAG_PATTERN = r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$"
+
+#: Tag names denoting a release candidate, e.g. v0.7.1-rc2
+RELEASE_CANDIDATE_TAG_PATTERN = \
+    r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)-rc(?P<rc>\d+)$"
 
 
 class VersioningError(RuntimeError):
@@ -68,6 +74,19 @@ def match_release_tag(tag: str) -> Optional[Tuple[int, int, int]]:
             int(match.group("patch")))
 
 
+def match_release_candidate_tag(tag: str) -> Optional[Tuple[int, int, int]]:
+    """
+    Returns the ``(major, minor, patch)`` triple of the release the given
+    release candidate tag is for, or ``None`` when the name is not a release
+    candidate tag name.
+    """
+    match = re.match(RELEASE_CANDIDATE_TAG_PATTERN, tag.strip())
+    if match is None:
+        return None
+    return (int(match.group("major")), int(match.group("minor")),
+            int(match.group("patch")))
+
+
 def normalize_local_label(branch: str) -> str:
     """
     Converts a branch name to a PEP 440 local version label
@@ -98,7 +117,9 @@ def get_version_for_release_branch(branch: str, cwd: str = None,
     major, minor = major_minor
     base = f"v{major}.{minor}"
     tag, _, ret = run_cmd(
-        cmd=f"git describe --tags --match {base}.* --abbrev=0",
+        # "Release candidate" tags (va.b.c-rcN) are not releases.
+        cmd=f"git describe --tags --match {base}.* --exclude *-rc* "
+            f"--abbrev=0",
         return_code=True, cwd=cwd,
     )
     if ret == 0 and tag:
@@ -159,6 +180,13 @@ def find_parent_release_branch(cwd: str = None) -> str:
     return candidates[-1][1]
 
 
+def get_commit(cwd: str = None) -> str:
+    """
+    Returns the full hash of the current ``HEAD`` commit.
+    """
+    return run_cmd(cmd="git rev-parse HEAD", cwd=cwd)
+
+
 def get_version(cwd: str = None, today: str = None) -> str:
     """
     Determines the package version from the state of the git repository.
@@ -172,10 +200,11 @@ def get_version(cwd: str = None, today: str = None) -> str:
     current_branch = run_cmd(cmd="git rev-parse --abbrev-ref HEAD", cwd=cwd)
     current_tags = run_cmd(cmd="git tag --points-at HEAD", cwd=cwd)
 
-    # 1. A tagged commit is a stable release.
+    # 1. A tagged commit (release or release candidate) is a stable release.
     for tag in current_tags.split("\n"):
-        if match_release_tag(tag) is not None:
-            return _strip_v(tag.strip())
+        release = match_release_tag(tag) or match_release_candidate_tag(tag)
+        if release is not None:
+            return "{}.{}.{}".format(*release)
 
     # 2. A release branch: the development version of the next patch release.
     if match_release_branch(current_branch) is not None:

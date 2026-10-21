@@ -26,7 +26,8 @@ from setuptools_us4us import setup_version
 
 setuptools.setup(
     name="my_package",
-    version=setup_version("my_package"),  # also writes my_package/version.py
+    # also writes my_package/version.py (__version__, __commit__)
+    version=setup_version("my_package"),
     ...
 )
 ```
@@ -36,10 +37,13 @@ setuptools.setup(
 - `setuptools_us4us/versioning.py`: git-based version numbers
   (`get_version`, `get_version_for_release_branch`,
   `find_parent_release_branch`):
-  - tagged commit `va.b.c` -> `a.b.c`,
+  - tagged commit `va.b.c` or release candidate `va.b.c-rcN` -> `a.b.c`
+    (a release candidate wheel file is built with the final version number),
   - release branch `va.b.x` -> `a.b.(c+1).devYYYYMMDD`,
   - feature branch -> parent release branch version + branch name as local
     label, e.g. `0.7.0.dev20260823+ref.mvandv.194`.
+  - release candidate tags are not taken into account when determining
+    the next dev version.
 - `setuptools_us4us/setup_helpers.py`: helpers for `setup.py`
   (`setup_version`, `write_version_file`, `read_version_file`,
   `is_dev_version`).
