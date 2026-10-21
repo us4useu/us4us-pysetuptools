@@ -5,7 +5,7 @@ import setuptools
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from us4us_pysetuptools.setup_helpers import setup_version  # noqa: E402
+from setuptools_us4us.setup_helpers import setup_version  # noqa: E402
 
 setuptools.setup(
     name="setuptools_us4us",

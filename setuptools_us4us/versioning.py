@@ -17,7 +17,7 @@ import datetime
 import re
 from typing import Optional, Sequence, Tuple
 
-from us4us_pysetuptools.cmd import run_cmd
+from setuptools_us4us.cmd import run_cmd
 
 RELEASE_BRANCH_PATTERNS = (
     # Example: v0.7.x
