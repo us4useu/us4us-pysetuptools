@@ -133,8 +133,12 @@ def get_version_for_release_branch(branch: str, cwd: str = None,
     return f"{base}.0.dev{today}"
 
 
-def _list_branches(cwd: str = None) -> Sequence[str]:
-    """Returns the names of all local and remote-tracking branches."""
+def _list_branches(cwd: str = None) -> Sequence[Tuple[str, str]]:
+    """
+    Returns ``(name, ref)`` pairs of all local and remote-tracking branches,
+    where ``name`` has no remote prefix (e.g. ``v0.7.x``) and ``ref`` is
+    the name git can resolve (e.g. ``origin/v0.7.x``).
+    """
     stdout, _, ret = run_cmd(
         cmd="git branch --all --format=%(refname:short)",
         return_code=True, cwd=cwd,
@@ -146,10 +150,11 @@ def _list_branches(cwd: str = None) -> Sequence[str]:
         name = line.strip()
         if not name or "->" in name:
             continue
+        ref = name
         # Drop the remote prefix, e.g. origin/v0.7.x -> v0.7.x
         if "/" in name:
             name = name.split("/", 1)[1]
-        branches.append(name)
+        branches.append((name, ref))
     return branches
 
 
@@ -157,19 +162,30 @@ def find_parent_release_branch(cwd: str = None) -> str:
     """
     Returns the release branch the current ``HEAD`` was most likely branched
     off from: out of all the release branches sharing a common ancestor with
-    ``HEAD``, the one with the highest ``major.minor``.
+    ``HEAD``, the one whose merge-base with ``HEAD`` is the closest to
+    ``HEAD`` (the smallest number of commits between the merge-base and
+    ``HEAD``); on a tie, the one with the highest ``major.minor``.
 
     :raises VersioningError: when no such branch exists
     """
     candidates = []
-    for branch in set(_list_branches(cwd=cwd)):
+    for branch, ref in set(_list_branches(cwd=cwd)):
         major_minor = match_release_branch(branch)
         if major_minor is None:
             continue
-        _, _, ret = run_cmd(cmd=f"git merge-base {branch} HEAD",
-                            return_code=True, cwd=cwd)
-        if ret == 0:
-            candidates.append((major_minor, branch))
+        # Use the full ref: in a CI checkout only the remote-tracking branch
+        # (e.g. origin/v0.7.x) exists, "git merge-base v0.7.x HEAD" fails.
+        merge_base, _, ret = run_cmd(cmd=f"git merge-base {ref} HEAD",
+                                     return_code=True, cwd=cwd)
+        if ret != 0:
+            continue
+        distance, _, ret = run_cmd(
+            cmd=f"git rev-list --count {merge_base}..HEAD",
+            return_code=True, cwd=cwd)
+        if ret != 0:
+            continue
+        # Closest merge-base first, then the highest major.minor.
+        candidates.append((-int(distance), major_minor, branch))
     if len(candidates) == 0:
         raise VersioningError(
             "Could not determine the version number: the current HEAD has no "
@@ -177,7 +193,7 @@ def find_parent_release_branch(cwd: str = None) -> str:
             "Make sure the release branches are fetched "
             "(e.g. 'git fetch --unshallow' in a CI checkout).")
     candidates = sorted(candidates)
-    return candidates[-1][1]
+    return candidates[-1][-1]
 
 
 def get_commit(cwd: str = None) -> str:
