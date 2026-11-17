@@ -217,10 +217,17 @@ def get_version(cwd: str = None, today: str = None) -> str:
     current_tags = run_cmd(cmd="git tag --points-at HEAD", cwd=cwd)
 
     # 1. A tagged commit (release or release candidate) is a stable release.
+    # On a release branch only the tags of that branch count, e.g. a new
+    # v0.6.x branched off a commit tagged v0.5.0-rc3 is not 0.5.0.
+    branch_major_minor = match_release_branch(current_branch)
     for tag in current_tags.split("\n"):
         release = match_release_tag(tag) or match_release_candidate_tag(tag)
-        if release is not None:
-            return "{}.{}.{}".format(*release)
+        if release is None:
+            continue
+        if (branch_major_minor is not None
+                and tuple(release[:2]) != tuple(branch_major_minor)):
+            continue
+        return "{}.{}.{}".format(*release[:3])
 
     # 2. A release branch: the development version of the next patch release.
     if match_release_branch(current_branch) is not None:
